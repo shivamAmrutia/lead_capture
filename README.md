@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lead Capture
 
-## Getting Started
+A small Next.js app for collecting leads. The form saves each submission to Supabase and then sends the saved lead to a webhook from the server. There is also a simple `/leads` page for reviewing submissions.
 
-First, run the development server:
+## Local Setup
+
+Install the dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env.local` file in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+CANDIDATE_NAME=Your Full Name
+LEAD_WEBHOOK_URL=https://webhook-receiver-flax.vercel.app/api/lead-webhook
+```
+
+Then start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+In Supabase, open the SQL editor and run the SQL from:
 
-## Learn More
+```text
+supabase/schema.sql
+```
 
-To learn more about Next.js, take a look at the following resources:
+That creates the `leads` table, turns on RLS, blocks anonymous client access, and adds a unique constraint on email so duplicate submissions can be handled cleanly.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How It Works
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The form lives on `/`. It validates in the browser first, then submits to a server action. The server action validates again, inserts the lead into Supabase, and posts the saved lead to the webhook.
 
-## Deploy on Vercel
+The webhook is treated as a side effect. If Supabase succeeds but the webhook fails, the user still sees a successful submission and the webhook failure is logged on the server.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The `/leads` page reads from Supabase on the server and sorts leads by newest first.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Local Webhook Testing
+
+For local testing, `LEAD_WEBHOOK_URL` can point to any test receiver. For example, a local receiver can use:
+
+```env
+LEAD_WEBHOOK_URL=http://localhost:4000/lead-webhook
+```
+
+For the final deployed version, set it back to the provided endpoint:
+
+```text
+https://webhook-receiver-flax.vercel.app/api/lead-webhook
+```
+
+Every webhook request includes `X-Candidate-Name` using the value from `CANDIDATE_NAME`.
+
+## Deployment
+
+Deploy on Vercel and add the same environment variables there:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CANDIDATE_NAME`
+- `LEAD_WEBHOOK_URL`
+
+After deploying, submit one test lead from the live site to confirm Supabase and the webhook are both wired up.
